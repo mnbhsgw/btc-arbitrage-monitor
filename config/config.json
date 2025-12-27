@@ -1,0 +1,21 @@
+{
+  "refreshIntervalSec": 10,
+  "minProfitRate": 0.01,
+  "exchanges": [
+    {
+      "id": "bitflyer",
+      "feeRate": 0.0015,
+      "enabled": true
+    },
+    {
+      "id": "coincheck",
+      "feeRate": 0.0,
+      "enabled": true
+    },
+    {
+      "id": "bitbank",
+      "feeRate": 0.0012,
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BTC/JPY アービトラージ監視</title>
+  <style>
+    :root {
+      --bg: #f5f1ea;
+      --card: #ffffff;
+      --ink: #1f1f1f;
+      --muted: #7a7a7a;
+      --accent: #0f6b4f;
+      --warn: #b54b3a;
+      --line: #e7e2d8;
+      --shadow: rgba(0, 0, 0, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "M PLUS 1", "Hiragino Sans", "Yu Gothic", sans-serif;
+      background: radial-gradient(1200px 600px at 10% 0%, #f9efe1, var(--bg));
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .status .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .status.error .dot { background: var(--warn); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px var(--shadow);
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+    }
+    th {
+      text-align: right;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    tr:last-child td { border-bottom: none; }
+    .muted { color: var(--muted); }
+    .ok { color: var(--accent); font-weight: 600; }
+    .err { color: var(--warn); font-weight: 600; }
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 18px 0;
+    }
+    @media (max-width: 720px) {
+      header { flex-direction: column; align-items: flex-start; }
+      th, td { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="card">
+      <div class="title">BTC/JPY アービトラージ監視</div>
+      <div>
+        <div id="overallStatus" class="status">
+          <span class="dot"></span>
+          <span>全取引所OK</span>
+        </div>
+        <div class="muted" id="lastUpdated">最終更新: --</div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>取引所一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>取引所</th>
+            <th>Best Ask</th>
+            <th>Best Bid</th>
+            <th>手数料考慮後買値</th>
+            <th>手数料考慮後売値</th>
+            <th>直近更新</th>
+            <th>ステータス</th>
+          </tr>
+        </thead>
+        <tbody id="exchangeBody"></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>裁定機会 Top 5</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>買い</th>
+            <th>売り</th>
+            <th>期待利益率</th>
+            <th>手数料考慮後買値</th>
+            <th>手数料考慮後売値</th>
+            <th>価格差</th>
+          </tr>
+        </thead>
+        <tbody id="opportunityBody"></tbody>
+      </table>
+      <div id="noOpp" class="empty" style="display:none;">機会なし</div>
+    </section>
+  </div>
+
+  <script>
+    const fmtJpy = (value) => {
+      if (value == null) return '--';
+      return new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(value);
+    };
+
+    const fmtRate = (value) => {
+      if (value == null) return '--';
+      return (value * 100).toFixed(2) + '%';
+    };
+
+    function renderExchanges(exchanges) {
+      const body = document.getElementById('exchangeBody');
+      body.innerHTML = '';
+      for (const ex of exchanges) {
+        const tr = document.createElement('tr');
+        const statusClass = ex.status === 'ok' ? 'ok' : 'err';
+        tr.innerHTML = `
+          <td>${ex.id}</td>
+          <td>${fmtJpy(ex.bestAsk)}</td>
+          <td>${fmtJpy(ex.bestBid)}</td>
+          <td>${fmtJpy(ex.feeAdjustedBuy)}</td>
+          <td>${fmtJpy(ex.feeAdjustedSell)}</td>
+          <td>${ex.lastUpdated ? new Date(ex.lastUpdated).toLocaleTimeString('ja-JP') : '--'}</td>
+          <td class="${statusClass}">${ex.status === 'ok' ? 'OK' : 'エラー'}</td>
+        `;
+        body.appendChild(tr);
+      }
+    }
+
+    function renderOpportunities(opps) {
+      const body = document.getElementById('opportunityBody');
+      body.innerHTML = '';
+      const noOpp = document.getElementById('noOpp');
+      if (!opps || opps.length === 0) {
+        noOpp.style.display = 'block';
+        return;
+      }
+      noOpp.style.display = 'none';
+      for (const op of opps) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${op.buyExchange}</td>
+          <td>${op.sellExchange}</td>
+          <td>${fmtRate(op.profitRate)}</td>
+          <td>${fmtJpy(op.feeAdjustedBuy)}</td>
+          <td>${fmtJpy(op.feeAdjustedSell)}</td>
+          <td>${fmtJpy(op.priceSpread)}</td>
+        `;
+        body.appendChild(tr);
+      }
+    }
+
+    function renderStatus(overview) {
+      const status = document.getElementById('overallStatus');
+      const label = status.querySelector('span:last-child');
+      status.classList.toggle('error', overview.overallStatus !== 'ok');
+      label.textContent = overview.overallStatus === 'ok' ? '全取引所OK' : '一部エラー';
+      document.getElementById('lastUpdated').textContent = '最終更新: ' + new Date(overview.timestamp).toLocaleTimeString('ja-JP');
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch('/api/overview');
+        const data = await res.json();
+        renderStatus(data);
+        renderExchanges(data.exchanges || []);
+        renderOpportunities(data.opportunities || []);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 10000);
+  </script>
+</body>
+</html>
