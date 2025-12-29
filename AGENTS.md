@@ -155,3 +155,18 @@
 - **bitFlyer**: `getticker` の `best_ask` / `best_bid` を使用。
 - **Coincheck**: `ticker` の `ask` / `bid` を使用。
 - **bitbank**: `ticker` の `data.sell`（Best Ask）/ `data.buy`（Best Bid）を使用。
+
+## Git運用ルール（AIエージェント向け）
+- ブランチ方針: 小さな変更は `main` 直、機能追加は `feature/*` で作業
+- AIは **明示の指示がない限り `git push` してはいけない**
+- 原則の流れ:
+  1. `git status` で差分確認（必要なら `git diff` の要点も提示）
+  2. `git add <files>`
+  3. `git commit -m "<動詞で始まる短い英語1行>"`
+  4. （指示がある場合のみ）`git push` またはPR作成
+- コミット粒度: 1コミット=1変更目的（UI変更・API変更などで分ける）
+- 仕様変更がある場合は AGENTS.md も更新し、実装と同じコミットに含める
+- PR運用: 仕様/計算/レスポンス変更はPR推奨、軽微なら省略可
+- マージ基準: CIがあれば成功必須、なければローカル起動確認
+- 破壊的変更（設定名/APIレスポンス変更など）は事前に合意してから実施
+- リリースタグ: 主要な機能追加時に `v0.x.y` を付与
