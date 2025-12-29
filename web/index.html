@@ -81,6 +81,14 @@
     .muted { color: var(--muted); }
     .ok { color: var(--accent); font-weight: 600; }
     .err { color: var(--warn); font-weight: 600; }
+    .best-buy {
+      background: #e7f4ec;
+      font-weight: 700;
+    }
+    .best-sell {
+      background: #fde8e6;
+      font-weight: 700;
+    }
     .empty {
       color: var(--muted);
       text-align: center;
@@ -156,15 +164,25 @@
     function renderExchanges(exchanges) {
       const body = document.getElementById('exchangeBody');
       body.innerHTML = '';
+      const validBuys = exchanges
+        .map((ex) => ex.feeAdjustedBuy)
+        .filter((value) => Number.isFinite(value));
+      const validSells = exchanges
+        .map((ex) => ex.feeAdjustedSell)
+        .filter((value) => Number.isFinite(value));
+      const minBuy = validBuys.length ? Math.min(...validBuys) : null;
+      const maxSell = validSells.length ? Math.max(...validSells) : null;
       for (const ex of exchanges) {
         const tr = document.createElement('tr');
         const statusClass = ex.status === 'ok' ? 'ok' : 'err';
+        const buyClass = minBuy != null && ex.feeAdjustedBuy === minBuy ? 'best-buy' : '';
+        const sellClass = maxSell != null && ex.feeAdjustedSell === maxSell ? 'best-sell' : '';
         tr.innerHTML = `
           <td>${ex.id}</td>
           <td>${fmtJpy(ex.bestAsk)}</td>
           <td>${fmtJpy(ex.bestBid)}</td>
-          <td>${fmtJpy(ex.feeAdjustedBuy)}</td>
-          <td>${fmtJpy(ex.feeAdjustedSell)}</td>
+          <td class="${buyClass}">${fmtJpy(ex.feeAdjustedBuy)}</td>
+          <td class="${sellClass}">${fmtJpy(ex.feeAdjustedSell)}</td>
           <td>${ex.lastUpdated ? new Date(ex.lastUpdated).toLocaleTimeString('ja-JP') : '--'}</td>
           <td class="${statusClass}">${ex.status === 'ok' ? 'OK' : 'エラー'}</td>
         `;
